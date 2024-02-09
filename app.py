@@ -20,7 +20,6 @@ def add_header(response):
     return response
 
 
-
 def get_db():
     db = getattr(g, '_database', None)
 
@@ -173,14 +172,75 @@ def room(room_id):
 # -------------------------------- API ROUTES ----------------------------------
 
 # POST to change the user's name
-@app.route('/api/user/name')
+# @app.route('/api/user/name')
+# def update_username():
+#     return {}, 403
+
+@app.route('/api/user/name', methods=['POST'])
 def update_username():
-    return {}, 403
+    # Assuming API key authentication and user identification are handled separately
+    # Extract the new name and the user's ID from the request
+    data = request.json
+    print("**********",data)
+    new_name = data['new_name']
+    user_id = request.cookies.get('user_id')  # Or use a different method for user identification
+    
+    # Update the user's name in the database
+    query_db('UPDATE users SET name = ? WHERE id = ?', [new_name, user_id])
+    return jsonify({'status': 'success'}), 200
 
 # POST to change the user's password
+@app.route('/api/user/password', methods=['POST'])
+def update_password():
+    # Extract the new password and the user's ID from the request
+    data = request.json
+    new_password = data['new_password']
+    user_id = request.cookies.get('user_id')  # Adjust based on your auth method
+    
+    # Update the user's password in the database
+    query_db('UPDATE users SET password = ? WHERE id = ?', [new_password, user_id])
+    return jsonify({'status': 'success'}), 200
 
 # POST to change the name of a room
-
+@app.route('/api/rooms/<int:room_id>/name', methods=['POST'])
+def change_room_name(room_id):
+    if not request.json or 'new_name' not in request.json:
+        return jsonify({'error': 'Missing new_name in request'}), 400
+    
+    new_name = request.json['new_name']
+    
+    # Authentication and authorization checks should go here
+    query_db('UPDATE rooms SET name = ? WHERE id = ??', [new_name, room_id])
+    
+    return jsonify({'success': True}), 200
 # GET to get all the messages in a room
+@app.route('/api/rooms/<int:room_id>/messages', methods=['GET'])
+def get_room_messages(room_id):
+    ###########################
+    print("get from db room", room_id,"#############")
+    messages = query_db("SELECT users.name, messages.body FROM messages INNER JOIN users ON messages.user_id = users.id WHERE messages.room_id = ?",
+                         [room_id])
+    # debug
+    # for msg in messages:
+    #     user_name = msg["name"]
+    #     body = msg["body"]
+    #     print("messagesssssssssssssssssssssss",user_name, body, "\n")
+    if messages:
+        return jsonify([dict(msg) for msg in messages]), 200
+    else:
+        return jsonify([]), 200
 
 # POST to post a new message to a room
+@app.route('/api/rooms/<int:room_id>/messages', methods=['POST'])
+def post_message_to_room(room_id):
+    if not request.json or 'message' not in request.json:
+        return jsonify({'error': 'Missing content in request'}), 400
+    data = request.json
+    content = data['message']
+    user_id = request.cookies.get('user_id')  
+    # user_name = query_db('select name from users WHERE id = ?', [user_id], one=True)
+    # user_name = user_name['name']
+    # print("*************\n", user_name,"\n",content,'\n',room_id,'\n')
+    query_db('INSERT INTO messages (user_id, room_id, body) VALUES (?, ?, ?)',
+                      [user_id, room_id, content])
+    return jsonify({'success': True}), 201
